@@ -83,7 +83,7 @@ const statConfigs: StatConfig[] = [
   },
   {
     key: "burstShots",
-    label: "Rounds per burst",
+    label: "Rounds per Burst",
     description: "Rounds per minute modifier - affects how fast weapons fire",
     unit: "%",
   },
