@@ -104,7 +104,7 @@ const getSingleWeaponDPS = (
 
   accuracy = Math.min(accuracy * targetSize, 1);
 
-  /* Scatter Hitchance */
+  /* Scatter Hitchance 
   let width = 0.5;
   let length = 0.5;
 
@@ -116,7 +116,7 @@ const getSingleWeaponDPS = (
     width = 3.5;
     length = targetSize / 3;
   }
-
+  */
   // count units
   let units = 1;
   if (target_unit?.weapon_member) {
@@ -130,7 +130,7 @@ const getSingleWeaponDPS = (
   let scatter_acc = 0;
 
   const weapon_class = weapon_member.weapon.path.split("/")[1];
-  if (weapon_class == "ballistic_weapon" && target_unit?.unit_type == "vehicles")
+  /*if (weapon_class == "ballistic_weapon" && target_unit?.unit_type == "vehicles")
     scatter_acc = getScatterHitChance(weapon_bag, distance != 0 ? distance : 1, width, length);
 
   let aoeDamageCombines = 0;
@@ -238,21 +238,21 @@ const getSingleWeaponDPS = (
 
     // new
     aoeDamageCombines = aoe_damage_multi;
-  }
+  }*/
 
   /* Combined accuracy */
-  const acc_combined = accuracy + (1 - accuracy) * scatter_acc;
+  //const acc_combined = accuracy + (1 - accuracy) * scatter_acc;
 
   /*   get rounds per minute
     --------------------------------------------------
   */
-  const rpm = getWeaponRpm(weapon_bag, distance, isMoving);
+  const rpm = getWeaponRpm(weapon_bag, distance, isMoving, attacking_unit);
   if (rpm == 0) return 0;
 
   /*   Apply Custom Modifiers
     --------------------------------------------------
   */
-  let finalAccuracy = acc_combined;
+  let finalAccuracy = accuracy;
   let finalDamage = avgDamage;
   let finalPenetrationChance = penetrationChance;
   let finalRpm = rpm;
@@ -265,7 +265,7 @@ const getSingleWeaponDPS = (
     // Apply accuracy modifier
     if (modifiers.accuracy.enabled) {
       if (modifiers.accuracy.type === "percentage") {
-        finalAccuracy = acc_combined * (1 + modifiers.accuracy.value / 100);
+        finalAccuracy = accuracy * (1 + modifiers.accuracy.value / 100);
       } else {
         finalAccuracy = modifiers.accuracy.value;
       }
@@ -296,7 +296,7 @@ const getSingleWeaponDPS = (
       finalPenetrationChance = Math.min(Math.max(modifiedPenetration, 0) / finalArmor, 1);
     }
 
-    // Apply RPM modifier
+    /* Apply RPM modifier
     if (modifiers.rpm.enabled) {
       if (modifiers.rpm.type === "percentage") {
         finalRpm = rpm * (1 + modifiers.rpm.value / 100);
@@ -304,7 +304,7 @@ const getSingleWeaponDPS = (
         finalRpm = modifiers.rpm.value;
       }
       finalRpm = Math.max(finalRpm, 0); // Ensure non-negative
-    }
+    }*/
   }
 
   // Recalculate hit chance with modified values
@@ -317,15 +317,31 @@ const getSingleWeaponDPS = (
   /*   Damage per Second *
     -------------------------------------------------
   */
-  const dps = (finalRpm / 60) * (finalHitChance * finalDamage + aoeDamageCombines);
+  const dps = (finalRpm / 60) * (finalHitChance * finalDamage);
 
   return dps * weapon_member.num;
 };
 
-export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving = false) => {
+export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving = false, attacking_unit?: CustomizableUnit,) => {
   // average aim time
-
-  const aimTime = getInterpolationByDistance(
+  let aimMod=1,windMod=1,cooldownMod=1,reloadMod=1,burstLength=1,burstShots=1;
+  if(attacking_unit?.custom_modifiers?.overallAttackSpeed.enabled){
+    let attackSpeedMod=1;
+    if(attacking_unit.custom_modifiers.overallAttackSpeed.type === "percentage")      attackSpeedMod=Math.max((1-(attacking_unit.custom_modifiers.overallAttackSpeed.value)/100),0); 
+    else attackSpeedMod=attacking_unit?.custom_modifiers?.overallAttackSpeed.value
+    aimMod *= attackSpeedMod;
+    windMod *= attackSpeedMod;
+    cooldownMod *= attackSpeedMod;
+    reloadMod *= attackSpeedMod;
+  }
+  if(attacking_unit?.custom_modifiers?.cooldownReload.enabled){
+    let rofMod=1;
+    if(attacking_unit.custom_modifiers.cooldownReload.type === "percentage")      rofMod=Math.max((1-(attacking_unit.custom_modifiers.cooldownReload.value)/100),0); 
+    else return attacking_unit.custom_modifiers.cooldownReload.value;
+    cooldownMod *= rofMod;
+    reloadMod *= rofMod;
+  }
+  const [aimTimeMin, aimTimeMax] = getInterpolationByDistanceMinMax(
     distance,
     weapon_bag.range,
     weapon_bag.fire_aim_time_min,
@@ -334,13 +350,14 @@ export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving
     weapon_bag.aim_time_multiplier_mid,
     weapon_bag.aim_time_multiplier_far,
   );
+  const aimTime = averageRoundedToNearestTick(aimTimeMin * aimMod, aimTimeMax * aimMod);
 
   // Cooldown
   let movingCooldownMp = 1;
   if (isMoving) movingCooldownMp = weapon_bag.moving_cooldown_multiplier;
 
-  const cooldown =
-    getInterpolationByDistance(
+  const [cooldownMin, cooldownMax] =
+    getInterpolationByDistanceMinMax(
       distance,
       weapon_bag.range,
       weapon_bag.cooldown_duration_min,
@@ -348,14 +365,15 @@ export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving
       weapon_bag.cooldown_duration_multiplier_near,
       weapon_bag.cooldown_duration_multiplier_mid,
       weapon_bag.cooldown_duration_multiplier_far,
-    ) * movingCooldownMp;
-
+    );
+    
+  const cooldown = averageRoundedToNearestTick(cooldownMin * movingCooldownMp * cooldownMod, cooldownMax * movingCooldownMp * cooldownMod);
   // 4 wind up/down
-  const windUp = weapon_bag.fire_wind_up;
-  const windDown = weapon_bag.fire_wind_down;
-
+  let windUp = Math.round(weapon_bag.fire_wind_up*windMod*8)/8;
+  const windDown = Math.round(weapon_bag.fire_wind_down*windMod*8)/8;
+  if(windUp>0) windUp += 0.125;
   // Reload duration
-  const reloadTime = getInterpolationByDistance(
+  const [reloadTimeMin, reloadTimeMax] = getInterpolationByDistanceMinMax(
     distance,
     weapon_bag.range,
     weapon_bag.reload_duration_min,
@@ -364,11 +382,22 @@ export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving
     weapon_bag.reload_duration_multiplier_mid,
     weapon_bag.reload_duration_multiplier_far,
   );
-
+  let reloadTime = cooldown;
+  if(attacking_unit?.custom_modifiers?.reload.enabled){
+    let reloadSpeedMod = 1
+    if(attacking_unit.custom_modifiers.reload.type === "percentage"){
+      reloadSpeedMod=Math.max((1-(attacking_unit.custom_modifiers.reload.value)/100),0);
+      reloadTime = averageRoundedToNearestTick(reloadTimeMin * reloadMod, reloadTimeMax * reloadMod);
+    }
+    else reloadTime = attacking_unit.custom_modifiers.reload.value;
+    reloadMod *= reloadSpeedMod;
+  }
+  else reloadTime = averageRoundedToNearestTick(reloadTimeMin, reloadTimeMax);
+  if(reloadTime==0) reloadTime = cooldown;
   // Avg clipSize (measured in number of cooldowns, thus we need to add the first shot)
   const avgClipSize = (weapon_bag.reload_frequency_min + weapon_bag.reload_frequency_max + 2) / 2;
 
-  let burstTime = 0;
+  let burstTime = 0.125;
 
   let shotsPerClip = avgClipSize;
 
@@ -384,8 +413,8 @@ export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving
     // burstTime_m = weapon_bag.burst_duration_multiplier_mid * movingBurstMp * avgBurstTime;
     // burstTime_f = weapon_bag.burst_duration_multiplier_far * movingBurstMp * avgBurstTime;
 
-    burstTime =
-      getInterpolationByDistance(
+    const [burstTimeMin, burstTimeMax] =
+      getInterpolationByDistanceMinMax(
         distance,
         weapon_bag.range,
         weapon_bag.burst_duration_min,
@@ -393,8 +422,17 @@ export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving
         weapon_bag.burst_duration_multiplier_near,
         weapon_bag.burst_duration_multiplier_mid,
         weapon_bag.burst_duration_multiplier_far,
-      ) * movingBurstMp;
-
+      );
+    let burstLengthMod = 1
+    if(attacking_unit?.custom_modifiers?.burstLength.enabled){
+      if(attacking_unit.custom_modifiers.burstLength.type === "percentage"){
+        burstLengthMod=(1+(attacking_unit.custom_modifiers.burstLength.value)/100);
+        burstTime = averageRoundedToNearestTick(burstTimeMin * movingBurstMp * burstLengthMod, burstTimeMax * movingBurstMp * burstLengthMod);
+      } 
+      else burstTime = attacking_unit.custom_modifiers.burstLength.value;
+    }
+    else burstTime = averageRoundedToNearestTick(burstTimeMin * movingBurstMp, burstTimeMax * movingBurstMp);
+    if(burstTime<0.125) burstTime=0.125;
     const burstRate = getInterpolationByDistance(
       distance,
       weapon_bag.range,
@@ -405,13 +443,22 @@ export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving
       weapon_bag.burst_rate_of_fire_multiplier_far,
     );
     // Shots per clip magazine
-
-    shotsPerClip = avgClipSize * burstTime * burstRate;
+    let burstShots = 1;
+    if(attacking_unit?.custom_modifiers?.burstShots.enabled){
+      let burstShotsMod = 1;
+      if(attacking_unit.custom_modifiers.burstShots.type === "percentage"){
+        burstShotsMod=(1+(attacking_unit.custom_modifiers.burstShots.value)/100);
+        burstShots = Math.round(burstTime * burstRate * burstShotsMod)
+      } 
+      else burstShots = attacking_unit.custom_modifiers.burstShots.value;
+    }
+    else burstShots = Math.round(burstTime * burstRate);
+    shotsPerClip = avgClipSize * burstShots;
   }
   let burstDuration = 0;
 
   // time for a burst (mg) or shot (single bolt)
-  burstDuration = aimTime + burstTime + cooldown + windDown + windUp;
+  burstDuration = aimTime + burstTime + cooldown + windDown + windUp + 0.125;
 
   // Time to empty the clip and reload
   const clipTime = avgClipSize * burstDuration - cooldown + reloadTime;
@@ -438,8 +485,6 @@ const getInterpolationByDistance = (
   // initialize
   let avg = (min + max) / 2;
 
-  if (avg == 0) avg = 1;
-
   let result = 0;
   const near = avg * multi_n;
   const mid = avg * multi_m;
@@ -455,6 +500,53 @@ const getInterpolationByDistance = (
   if (capMax && capMax > 0) result = Math.min(result, capMax);
 
   return result;
+};
+
+const getInterpolationByDistanceMinMax = (
+  distance: number,
+  range: RangeType,
+  min: number,
+  max: number,
+  multi_n: number,
+  multi_m: number,
+  multi_f: number,
+  capMax?: number,
+) => {
+  if (distance > range.max) return [0,0];
+
+  // initialize
+  //let avg = (min + max) / 2;
+
+  //if (avg == 0) avg = 0;
+
+  let resultMin = 0;
+  let resultMax = 0;
+  const minNear = min * multi_n;
+  const minMid = min * multi_m;
+  const minFar = min * multi_f;
+  const maxNear = max * multi_n;
+  const maxMid = max * multi_m;
+  const maxFar = max * multi_f;
+
+  if (distance > range.far) resultMin = minFar;
+  else if (distance > range.mid)
+    resultMin = minMid - ((minMid - minFar) / (range.mid - range.far)) * (range.mid - distance);
+  else if (distance > range.near)
+    resultMin = minNear - ((minNear - minMid) / (range.near - range.mid)) * (range.near - distance);
+  else resultMin = minNear;
+
+  if (capMax && capMax > 0) resultMin = Math.min(resultMin, capMax);
+
+  if (distance > range.far) resultMax = maxFar;
+  else if (distance > range.mid)
+    resultMax = maxMid - ((maxMid - maxFar) / (range.mid - range.far)) * (range.mid - distance);
+  else if (distance > range.near)
+    resultMax = maxNear - ((maxNear - maxMid) / (range.near - range.mid)) * (range.near - distance);
+  else resultMax = maxNear;
+
+  if (capMax && capMax > 0) resultMax = Math.max(resultMax, capMax);
+
+  return [resultMin, resultMax];
 };
 
 const getScatterHitChance = (
@@ -507,6 +599,40 @@ const getScatterArea = (distance = 0, weapon_bag: WeaponStatsType) => {
     (Math.PI * Math.pow(range_max, 2) - Math.PI * Math.pow(range_min, 2)) * (scatter_angle / 360);
 
   return scatter_area;
+};
+
+const averageRoundedToNearestTick = (min: number, max: number): number => {
+  if (min > max) {
+    [min, max] = [max, min];
+  }
+
+  if (min==max) {
+    return Math.round(min * 8) / 8;
+  }
+
+  const lo = min * 8;
+  const hi = max * 8;
+
+  let weightedSum = 0;
+
+  const firstK = Math.floor(lo - 0.5);
+  const lastK = Math.ceil(hi + 0.5);
+
+  for (let k = firstK; k <= lastK; k++) {
+    const intervalStart = k - 0.5;
+    const intervalEnd = k + 0.5;
+
+    const overlapStart = Math.max(lo, intervalStart);
+    const overlapEnd = Math.min(hi, intervalEnd);
+    const overlap = overlapEnd - overlapStart;
+
+    if (overlap > 0) {
+      const roundedValue = k / 8;
+      weightedSum += roundedValue * overlap;
+    }
+  }
+
+  return weightedSum / (hi - lo);
 };
 
 export { getSingleWeaponDPS, getScatterArea };
