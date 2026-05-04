@@ -544,7 +544,7 @@ const getInterpolationByDistanceMinMax = (
     resultMax = maxNear - ((maxNear - maxMid) / (range.near - range.mid)) * (range.near - distance);
   else resultMax = maxNear;
 
-  if (capMax && capMax > 0) resultMax = Math.max(resultMax, capMax);
+  if (capMax && capMax > 0) resultMax = Math.min(resultMax, capMax);
 
   return [resultMin, resultMax];
 };
