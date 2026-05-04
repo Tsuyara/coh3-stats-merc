@@ -324,7 +324,7 @@ const getSingleWeaponDPS = (
 
 export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving = false, attacking_unit?: CustomizableUnit,) => {
   // average aim time
-  let aimMod=1,windMod=1,cooldownMod=1,reloadMod=1,burstLength=1,burstShots=1;
+  let aimMod=1,windMod=1,cooldownMod=1,reloadMod=1;
   if(attacking_unit?.custom_modifiers?.overallAttackSpeed.enabled){
     let attackSpeedMod=1;
     if(attacking_unit.custom_modifiers.overallAttackSpeed.type === "percentage")      attackSpeedMod=Math.max((1-(attacking_unit.custom_modifiers.overallAttackSpeed.value)/100),0); 
@@ -387,10 +387,10 @@ export const getWeaponRpm = (weapon_bag: WeaponStatsType, distance = 0, isMoving
     let reloadSpeedMod = 1
     if(attacking_unit.custom_modifiers.reload.type === "percentage"){
       reloadSpeedMod=Math.max((1-(attacking_unit.custom_modifiers.reload.value)/100),0);
+        reloadMod *= reloadSpeedMod;
       reloadTime = averageRoundedToNearestTick(reloadTimeMin * reloadMod, reloadTimeMax * reloadMod);
     }
     else reloadTime = attacking_unit.custom_modifiers.reload.value;
-    reloadMod *= reloadSpeedMod;
   }
   else reloadTime = averageRoundedToNearestTick(reloadTimeMin, reloadTimeMax);
   if(reloadTime==0) reloadTime = cooldown;
