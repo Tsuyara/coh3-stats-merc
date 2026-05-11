@@ -46,8 +46,7 @@ const resolveTextFormatterLocstring = (
   if (!locKey) return null;
 
   // Look up the localized formatter string.
-  const foundFormatterLoc =
-    unitStatsLocStringCache[locale]?.[locKey] ?? null;
+  const foundFormatterLoc = unitStatsLocStringCache[locale]?.[locKey] ?? null;
 
   if (!foundFormatterLoc) return null;
 
