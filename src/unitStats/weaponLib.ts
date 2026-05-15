@@ -121,7 +121,7 @@ const getSingleWeaponDPS = (
 
   accuracy = Math.min(accuracy * targetSize, 1);
 
-  /* Scatter Hitchance 
+  /* Scatter Hitchance
   let width = 0.5;
   let length = 0.5;
 
@@ -346,28 +346,36 @@ export const getWeaponRpm = (
   attacking_unit?: CustomizableUnit,
 ) => {
   // average aim time
-  let aimMod = 1,
-    windMod = 1,
-    cooldownMod = 1,
-    reloadMod = 1;
+  let aimMod = 1;
+  let windMod = 1;
+  let cooldownMod = 1;
+  let reloadMod = 1;
+
   if (attacking_unit?.custom_modifiers?.overallAttackSpeed.enabled) {
     let attackSpeedMod = 1;
-    if (attacking_unit.custom_modifiers.overallAttackSpeed.type === "percentage")
+    if (attacking_unit.custom_modifiers.overallAttackSpeed.type === "percentage") {
       attackSpeedMod = Math.max(
         1 - attacking_unit.custom_modifiers.overallAttackSpeed.value / 100,
         0,
       );
-    else attackSpeedMod = attacking_unit?.custom_modifiers?.overallAttackSpeed.value;
+    } else {
+      attackSpeedMod = attacking_unit?.custom_modifiers?.overallAttackSpeed.value;
+    }
     aimMod *= attackSpeedMod;
     windMod *= attackSpeedMod;
     cooldownMod *= attackSpeedMod;
     reloadMod *= attackSpeedMod;
   }
+
   if (attacking_unit?.custom_modifiers?.cooldownReload.enabled) {
     let rofMod = 1;
-    if (attacking_unit.custom_modifiers.cooldownReload.type === "percentage")
+
+    if (attacking_unit.custom_modifiers.cooldownReload.type === "percentage") {
       rofMod = Math.max(1 - attacking_unit.custom_modifiers.cooldownReload.value / 100, 0);
-    else return attacking_unit.custom_modifiers.cooldownReload.value;
+    } else {
+      return attacking_unit.custom_modifiers.cooldownReload.value;
+    }
+
     cooldownMod *= rofMod;
     reloadMod *= rofMod;
   }
@@ -416,16 +424,19 @@ export const getWeaponRpm = (
   );
   let reloadTime = cooldown;
   if (attacking_unit?.custom_modifiers?.reload.enabled) {
-    let reloadSpeedMod = 1;
     if (attacking_unit.custom_modifiers.reload.type === "percentage") {
-      reloadSpeedMod = Math.max(1 - attacking_unit.custom_modifiers.reload.value / 100, 0);
+      const reloadSpeedMod = Math.max(1 - attacking_unit.custom_modifiers.reload.value / 100, 0);
       reloadMod *= reloadSpeedMod;
       reloadTime = averageRoundedToNearestTick(
         reloadTimeMin * reloadMod,
         reloadTimeMax * reloadMod,
       );
-    } else reloadTime = attacking_unit.custom_modifiers.reload.value;
-  } else reloadTime = averageRoundedToNearestTick(reloadTimeMin, reloadTimeMax);
+    } else {
+      reloadTime = attacking_unit.custom_modifiers.reload.value;
+    }
+  } else {
+    reloadTime = averageRoundedToNearestTick(reloadTimeMin, reloadTimeMax);
+  }
   if (reloadTime == 0) reloadTime = cooldown;
   // Avg clipSize (measured in number of cooldowns, thus we need to add the first shot)
   const avgClipSize = (weapon_bag.reload_frequency_min + weapon_bag.reload_frequency_max + 2) / 2;
@@ -486,13 +497,17 @@ export const getWeaponRpm = (
       if (attacking_unit.custom_modifiers.burstShots.type === "percentage") {
         burstShotsMod = 1 + attacking_unit.custom_modifiers.burstShots.value / 100;
         burstShots = Math.round(burstTime * burstRate * burstShotsMod);
-      } else burstShots = attacking_unit.custom_modifiers.burstShots.value;
-    } else burstShots = Math.round(burstTime * burstRate);
+      } else {
+        burstShots = attacking_unit.custom_modifiers.burstShots.value;
+      }
+    } else {
+      burstShots = Math.round(burstTime * burstRate);
+    }
     shotsPerClip = avgClipSize * burstShots;
   }
   let burstDuration = 0;
 
-  // time for a burst (mg) or shot (single bolt)
+  // time for a burst (mg) or shot (single bolt) + tick time
   burstDuration = aimTime + burstTime + cooldown + windDown + windUp + 0.125;
 
   // Time to empty the clip and reload
