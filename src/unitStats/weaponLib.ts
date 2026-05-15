@@ -379,7 +379,7 @@ export const getWeaponRpm = (
     cooldownMod *= rofMod;
     reloadMod *= rofMod;
   }
-  const [aimTimeMin, aimTimeMax] = getInterpolationByDistanceMinMax(
+  const [aimTimeMin, aimTimeMax] = _getInterpolationByDistanceMinMax(
     distance,
     weapon_bag.range,
     weapon_bag.fire_aim_time_min,
@@ -388,13 +388,13 @@ export const getWeaponRpm = (
     weapon_bag.aim_time_multiplier_mid,
     weapon_bag.aim_time_multiplier_far,
   );
-  const aimTime = averageRoundedToNearestTick(aimTimeMin * aimMod, aimTimeMax * aimMod);
+  const aimTime = _averageRoundedToNearestTick(aimTimeMin * aimMod, aimTimeMax * aimMod);
 
   // Cooldown
   let movingCooldownMp = 1;
   if (isMoving) movingCooldownMp = weapon_bag.moving_cooldown_multiplier;
 
-  const [cooldownMin, cooldownMax] = getInterpolationByDistanceMinMax(
+  const [cooldownMin, cooldownMax] = _getInterpolationByDistanceMinMax(
     distance,
     weapon_bag.range,
     weapon_bag.cooldown_duration_min,
@@ -404,7 +404,7 @@ export const getWeaponRpm = (
     weapon_bag.cooldown_duration_multiplier_far,
   );
 
-  const cooldown = averageRoundedToNearestTick(
+  const cooldown = _averageRoundedToNearestTick(
     cooldownMin * movingCooldownMp * cooldownMod,
     cooldownMax * movingCooldownMp * cooldownMod,
   );
@@ -413,7 +413,7 @@ export const getWeaponRpm = (
   const windDown = Math.round(weapon_bag.fire_wind_down * windMod * 8) / 8;
   if (windUp > 0) windUp += 0.125;
   // Reload duration
-  const [reloadTimeMin, reloadTimeMax] = getInterpolationByDistanceMinMax(
+  const [reloadTimeMin, reloadTimeMax] = _getInterpolationByDistanceMinMax(
     distance,
     weapon_bag.range,
     weapon_bag.reload_duration_min,
@@ -427,7 +427,7 @@ export const getWeaponRpm = (
     if (attacking_unit.custom_modifiers.reload.type === "percentage") {
       const reloadSpeedMod = Math.max(1 - attacking_unit.custom_modifiers.reload.value / 100, 0);
       reloadMod *= reloadSpeedMod;
-      reloadTime = averageRoundedToNearestTick(
+      reloadTime = _averageRoundedToNearestTick(
         reloadTimeMin * reloadMod,
         reloadTimeMax * reloadMod,
       );
@@ -435,7 +435,7 @@ export const getWeaponRpm = (
       reloadTime = attacking_unit.custom_modifiers.reload.value;
     }
   } else {
-    reloadTime = averageRoundedToNearestTick(reloadTimeMin, reloadTimeMax);
+    reloadTime = _averageRoundedToNearestTick(reloadTimeMin, reloadTimeMax);
   }
   if (reloadTime == 0) reloadTime = cooldown;
   // Avg clipSize (measured in number of cooldowns, thus we need to add the first shot)
@@ -457,7 +457,7 @@ export const getWeaponRpm = (
     // burstTime_m = weapon_bag.burst_duration_multiplier_mid * movingBurstMp * avgBurstTime;
     // burstTime_f = weapon_bag.burst_duration_multiplier_far * movingBurstMp * avgBurstTime;
 
-    const [burstTimeMin, burstTimeMax] = getInterpolationByDistanceMinMax(
+    const [burstTimeMin, burstTimeMax] = _getInterpolationByDistanceMinMax(
       distance,
       weapon_bag.range,
       weapon_bag.burst_duration_min,
@@ -469,7 +469,7 @@ export const getWeaponRpm = (
     if (attacking_unit?.custom_modifiers?.burstLength.enabled) {
       if (attacking_unit.custom_modifiers.burstLength.type === "percentage") {
         const burstLengthMod = 1 + attacking_unit.custom_modifiers.burstLength.value / 100;
-        burstTime = averageRoundedToNearestTick(
+        burstTime = _averageRoundedToNearestTick(
           burstTimeMin * movingBurstMp * burstLengthMod,
           burstTimeMax * movingBurstMp * burstLengthMod,
         );
@@ -477,7 +477,7 @@ export const getWeaponRpm = (
         burstTime = attacking_unit.custom_modifiers.burstLength.value;
       }
     } else
-      burstTime = averageRoundedToNearestTick(
+      burstTime = _averageRoundedToNearestTick(
         burstTimeMin * movingBurstMp,
         burstTimeMax * movingBurstMp,
       );
@@ -555,7 +555,7 @@ const getInterpolationByDistance = (
   return result;
 };
 
-const getInterpolationByDistanceMinMax = (
+const _getInterpolationByDistanceMinMax = (
   distance: number,
   range: RangeType,
   min: number,
@@ -656,7 +656,7 @@ const getScatterArea = (distance = 0, weapon_bag: WeaponStatsType) => {
   return scatter_area;
 };
 
-const averageRoundedToNearestTick = (min: number, max: number): number => {
+const _averageRoundedToNearestTick = (min: number, max: number): number => {
   if (min > max) {
     [min, max] = [max, min];
   }
@@ -689,6 +689,7 @@ const averageRoundedToNearestTick = (min: number, max: number): number => {
 
   return weightedSum / (hi - lo);
 };
+
 type TargetTypeModifier = {
   unit_type: string;
   dmg_modifier: number;
@@ -705,10 +706,10 @@ type AppliedTargetModifiers = {
   matched_unit_types: string[];
 };
 
-function getTargetTypeModifiers(
+const getTargetTypeModifiers = (
   targetTypeTable: TargetTypeModifier[] | undefined,
   targetUnitTypes: string[],
-): AppliedTargetModifiers {
+): AppliedTargetModifiers => {
   const result: AppliedTargetModifiers = {
     base_damage_modifier: 0,
     accuracy_multiplier: 1,
@@ -734,6 +735,11 @@ function getTargetTypeModifiers(
   }
 
   return result;
-}
+};
 
-export { getSingleWeaponDPS, getScatterArea };
+export {
+  getSingleWeaponDPS,
+  getScatterArea,
+  _averageRoundedToNearestTick,
+  _getInterpolationByDistanceMinMax,
+};
