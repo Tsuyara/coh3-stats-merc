@@ -60,13 +60,15 @@ const statConfigs: StatConfig[] = [
   {
     key: "cooldownReload",
     label: "Rate of Fire",
-    description: "Cooldown and Reload modifier - affects how fast weapons fire, do not add together",
+    description:
+      "Cooldown and Reload modifier - affects how fast weapons fire, do not add together",
     unit: "%",
   },
   {
     key: "overallAttackSpeed",
     label: "Overall Attack Speed",
-    description: "Time between burst modifier - affects how fast weapons fire, do not add together",
+    description:
+      "Time between burst modifier - affects how fast weapons fire, do not add together",
     unit: "%",
   },
   {
