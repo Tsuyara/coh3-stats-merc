@@ -23,7 +23,7 @@ const getSingleWeaponDPS = (
 
   const weapon_bag = weapon_member.weapon.weapon_bag;
 
-  if (!weapon_bag.moving_can_fire_while_moving && isMoving == true) return 0;
+  if (!weapon_bag.moving_can_fire_while_moving && isMoving) return 0;
 
   let cover = {
     accuracy_multiplier: 1, // opponent cover penalty
@@ -466,21 +466,23 @@ export const getWeaponRpm = (
       weapon_bag.burst_duration_multiplier_mid,
       weapon_bag.burst_duration_multiplier_far,
     );
-    let burstLengthMod = 1;
     if (attacking_unit?.custom_modifiers?.burstLength.enabled) {
       if (attacking_unit.custom_modifiers.burstLength.type === "percentage") {
-        burstLengthMod = 1 + attacking_unit.custom_modifiers.burstLength.value / 100;
+        const burstLengthMod = 1 + attacking_unit.custom_modifiers.burstLength.value / 100;
         burstTime = averageRoundedToNearestTick(
           burstTimeMin * movingBurstMp * burstLengthMod,
           burstTimeMax * movingBurstMp * burstLengthMod,
         );
-      } else burstTime = attacking_unit.custom_modifiers.burstLength.value;
+      } else {
+        burstTime = attacking_unit.custom_modifiers.burstLength.value;
+      }
     } else
       burstTime = averageRoundedToNearestTick(
         burstTimeMin * movingBurstMp,
         burstTimeMax * movingBurstMp,
       );
     if (burstTime < 0.125) burstTime = 0.125;
+
     const burstRate = getInterpolationByDistance(
       distance,
       weapon_bag.range,
@@ -492,10 +494,10 @@ export const getWeaponRpm = (
     );
     // Shots per clip magazine
     let burstShots = 1;
+
     if (attacking_unit?.custom_modifiers?.burstShots.enabled) {
-      let burstShotsMod = 1;
       if (attacking_unit.custom_modifiers.burstShots.type === "percentage") {
-        burstShotsMod = 1 + attacking_unit.custom_modifiers.burstShots.value / 100;
+        const burstShotsMod = 1 + attacking_unit.custom_modifiers.burstShots.value / 100;
         burstShots = Math.round(burstTime * burstRate * burstShotsMod);
       } else {
         burstShots = attacking_unit.custom_modifiers.burstShots.value;
@@ -503,6 +505,7 @@ export const getWeaponRpm = (
     } else {
       burstShots = Math.round(burstTime * burstRate);
     }
+
     shotsPerClip = avgClipSize * burstShots;
   }
   let burstDuration = 0;
